@@ -202,6 +202,8 @@ def list_files(
     current_user: str = Depends(get_current_user),
 ):
     user = db.query(models.User).filter_by(username=current_user).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found — please log in again")
     files = db.query(models.File).filter_by(user_id=user.id).all()
     return {
         "files": [

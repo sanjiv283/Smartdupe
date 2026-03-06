@@ -2,7 +2,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./smartdupe.db")
+# Use /tmp on Render (writable), local file otherwise
+DEFAULT_DB = "sqlite:////tmp/smartdupe.db" if os.getenv("RENDER") else "sqlite:///./smartdupe.db"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB)
 
 # Render provides postgres:// URLs but SQLAlchemy requires postgresql://
 if DATABASE_URL.startswith("postgres://"):
