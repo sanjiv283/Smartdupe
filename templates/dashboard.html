@@ -369,11 +369,11 @@
         </div>
 
         <div class="upload-zone" id="drop-zone">
-          <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx"/>
+          <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx" style="display:none" onchange="showSelectedFiles()"/>
           <div class="upload-icon">📂</div>
-          <h3>Drop files here to analyse</h3>
-          <p>Supports PDF, images, DOCX, TXT — max 50 MB each</p>
-          <button class="upload-btn" id="upload-btn" onclick="uploadFiles(event)">Upload & Analyse</button>
+          <h3>Click here or drop files to select</h3>
+          <p id="file-selected-label">Supports PDF, images, DOCX, TXT — max 50 MB each</p>
+          <button class="upload-btn" id="upload-btn" onclick="event.stopPropagation(); uploadFiles(event)">Upload & Analyse</button>
         </div>
 
         <div id="upload-progress">
@@ -428,6 +428,15 @@
       setupDropZone();
     }
 
+    function showSelectedFiles() {
+      const input = document.getElementById('file-input');
+      const label = document.getElementById('file-selected-label');
+      if (input && label && input.files.length > 0) {
+        label.textContent = input.files.length + ' file(s) selected — click Upload & Analyse';
+        label.style.color = 'var(--accent)';
+      }
+    }
+
     function setupDropZone() {
       const zone = document.getElementById('drop-zone');
       if (!zone) return;
@@ -440,6 +449,7 @@
         const dt = new DataTransfer();
         [...e.dataTransfer.files].forEach(f => dt.items.add(f));
         input.files = dt.files;
+        showSelectedFiles();
       });
     }
 
