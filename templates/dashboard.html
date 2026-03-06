@@ -368,12 +368,19 @@
           <div class="stat-card"><div class="stat-label">AI Clusters</div><div class="stat-value purple">${clusters}</div></div>
         </div>
 
-        <div class="upload-zone" id="drop-zone">
-          <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx" style="display:none" onchange="showSelectedFiles()"/>
+        <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx" style="display:none" onchange="showSelectedFiles()"/>
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <div class="upload-icon">📂</div>
-          <h3>Click here or drop files to select</h3>
+          <h3>Click here to select files</h3>
           <p id="file-selected-label">Supports PDF, images, DOCX, TXT — max 50 MB each</p>
-          <button class="upload-btn" id="upload-btn" onclick="event.stopPropagation(); uploadFiles(event)">Upload & Analyse</button>
+        </div>
+        <div style="text-align:center;margin-top:16px;display:flex;gap:12px;justify-content:center;">
+          <button class="upload-btn" id="upload-btn" onclick="doUpload(event)" style="background:linear-gradient(135deg,#00e5ff,#0099bb);">
+            📤 Upload Files
+          </button>
+          <button class="upload-btn" id="analyse-btn" onclick="doAnalyse(event)" style="background:linear-gradient(135deg,#7c3aed,#4f1db5);" disabled>
+            🧠 Analyse
+          </button>
         </div>
 
         <div id="upload-progress">
@@ -453,18 +460,23 @@
       });
     }
 
-    async function uploadFiles(e) {
+    // Stores uploaded file results for the analyse step
+    let uploadedResults = [];
+
+    async function doUpload(e) {
       e.stopPropagation();
       const input = document.getElementById('file-input');
       if (!input.files.length) return showToast('Please select files first.', 'error');
 
       const btn = document.getElementById('upload-btn');
+      const analyseBtn = document.getElementById('analyse-btn');
       const progress = document.getElementById('upload-progress');
       const fill = document.getElementById('progress-fill');
       const label = document.getElementById('progress-label');
 
       btn.disabled = true;
-      btn.textContent = 'Analysing…';
+      btn.textContent = '🔄 Uploading…';
+      analyseBtn.disabled = true;
       progress.style.display = 'block';
       fill.style.width = '10%';
       label.textContent = `Uploading ${input.files.length} file(s)…`;
@@ -473,34 +485,58 @@
       [...input.files].forEach(f => formData.append('files', f));
 
       try {
-        fill.style.width = '40%';
+        fill.style.width = '50%';
         const res = await fetch('/upload', {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token },
           body: formData
         });
-        fill.style.width = '80%';
+        fill.style.width = '100%';
         const data = await res.json();
 
         if (!res.ok) {
           showToast(data.detail || 'Upload failed.', 'error');
+          analyseBtn.disabled = true;
         } else {
-          fill.style.width = '100%';
-          const dupes = data.uploaded.filter(f => f.is_exact_duplicate).length;
-          const near  = data.uploaded.filter(f => f.ai_near_duplicate).length;
-          let msg = `✓ ${data.uploaded.length} file(s) uploaded.`;
-          if (dupes) msg += ` ${dupes} exact dupe(s).`;
-          if (near)  msg += ` ${near} near-dupe(s).`;
-          showToast(msg);
-          setTimeout(() => loadFiles(), 600);
+          uploadedResults = data.uploaded;
+          showToast(`✓ ${data.uploaded.length} file(s) uploaded! Now click Analyse.`);
+          analyseBtn.disabled = false;
+          analyseBtn.style.opacity = '1';
         }
       } catch {
         showToast('Network error during upload.', 'error');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Upload & Analyse';
-        setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 1200);
+        btn.textContent = '📤 Upload Files';
+        setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 1000);
       }
+    }
+
+    async function doAnalyse(e) {
+      e.stopPropagation();
+      if (!uploadedResults.length) return showToast('Please upload files first.', 'error');
+
+      const btn = document.getElementById('analyse-btn');
+      btn.disabled = true;
+      btn.textContent = '🧠 Analysing…';
+
+      // Results are already computed during upload — just load and display them
+      const dupes = uploadedResults.filter(f => f.is_exact_duplicate).length;
+      const near  = uploadedResults.filter(f => f.ai_near_duplicate).length;
+
+      let msg = `🧠 Analysis complete! ${uploadedResults.length} file(s) processed.`;
+      if (dupes) msg += ` ${dupes} exact duplicate(s) found.`;
+      if (near)  msg += ` ${near} near-duplicate(s) found.`;
+
+      showToast(msg);
+      await loadFiles();
+
+      btn.textContent = '✓ Done';
+      uploadedResults = [];
+      setTimeout(() => {
+        btn.disabled = true;
+        btn.textContent = '🧠 Analyse';
+      }, 2000);
     }
 
     async function loadFiles() {
