@@ -17,6 +17,7 @@ from hashing import partial_hash, full_hash
 from dedupe import size_tolerance_group, find_exact_duplicate
 from ai_similarity import get_embedding_for_file, cluster_files, compute_similarity_matrix
 from auth import hash_password, verify_password, create_access_token, get_current_user
+from similarity_tiers import get_tier, tier_summary
 
 app = FastAPI(title="SmartDupe")
 
@@ -93,7 +94,7 @@ async def upload(
         stored_filename, path, _ = await save_file(upload_file)
         file_type = get_file_type(upload_file.filename)
 
-        # 4. Two-stage hashing (text files are normalised inside hashing.py)
+        # 4. Two-stage hashing (text files normalised inside hashing.py)
         try:
             p_hash = partial_hash(path)
             f_hash = full_hash(path)
@@ -106,7 +107,6 @@ async def upload(
 
         class _Temp:
             id = -1
-
         _Temp.size = size
 
         candidate_groups = size_tolerance_group(existing_files + [_Temp()])
@@ -119,7 +119,6 @@ async def upload(
         # 6. Exact duplicate check via full hash
         class _HashTemp:
             pass
-
         ht = _HashTemp()
         ht.full_hash = f_hash
 
@@ -131,17 +130,13 @@ async def upload(
         embedding = get_embedding_for_file(path, file_type)
         embedding_json = json.dumps(embedding) if embedding else None
 
-        # 8. AI similarity — compute cosine similarity against ALL user files
-        #    (not just size-grouped candidates) so we never miss a near-duplicate.
-        #    We ALWAYS store the best score, regardless of threshold, so the UI
-        #    can always display it.  The "near_duplicate" flag is raised at >0.92.
+        # 8. AI similarity — search ALL user files, always store best score
         best_similarity_score = None
         best_similarity_filename = None
-        ai_similarity_result = None
 
         if not is_duplicate and embedding:
             best_score = -1.0
-            for candidate in existing_files:          # search ALL files
+            for candidate in existing_files:
                 if candidate.embedding_vector:
                     try:
                         cand_vec = json.loads(candidate.embedding_vector)
@@ -153,15 +148,10 @@ async def upload(
                     except Exception:
                         continue
 
-            # Always expose the score; flag near-duplicates above threshold
-            if best_score >= 0.92:
-                ai_similarity_result = {
-                    "near_duplicate_of": best_similarity_filename,
-                    "similarity_score": best_similarity_score,
-                    "similarity_percent": f"{best_similarity_score * 100:.1f}%",
-                }
+        # 9. Determine tier
+        tier = get_tier(best_similarity_score, is_exact_duplicate=is_duplicate)
 
-        # 9. Save to database
+        # 10. Save to database
         file_record = models.File(
             original_filename=upload_file.filename,
             stored_filename=stored_filename,
@@ -172,7 +162,6 @@ async def upload(
             full_hash=f_hash,
             is_duplicate=is_duplicate,
             duplicate_of_id=duplicate_of_id,
-            # Always persist the best score found (None if no embedding available)
             similarity_score=best_similarity_score,
             similar_to_filename=best_similarity_filename,
             embedding_vector=embedding_json,
@@ -182,7 +171,7 @@ async def upload(
         db.commit()
         db.refresh(file_record)
 
-        # 10. Re-run clustering across all user files after every upload
+        # 11. Re-run clustering across all user files
         all_user_files = db.query(models.File).filter_by(user_id=user.id).all()
         cluster_map = cluster_files(all_user_files)
         for fid, cid in cluster_map.items():
@@ -193,26 +182,29 @@ async def upload(
             "file": upload_file.filename,
             "type": file_type,
             "size_bytes": size,
-            "is_exact_duplicate": is_duplicate,
             "cluster_id": cluster_map.get(file_record.id),
-            # Always show similarity score when available
-            "similarity_score": best_similarity_score,
-            "similarity_percent": (
-                f"{best_similarity_score * 100:.1f}%" if best_similarity_score is not None else None
-            ),
             "most_similar_to": best_similarity_filename,
+            # ── Three-tier similarity result ──────────────────────────────
+            "similarity": {
+                "score": best_similarity_score,
+                "percent": tier["percent"],
+                "tier": tier["tier"],
+                "label": tier["label"],
+                "emoji": tier["emoji"],
+                "action": tier["action"],
+                "summary": tier_summary(tier),
+            },
         }
+
         if duplicate_of_id:
             result["duplicate_of_id"] = duplicate_of_id
-        if ai_similarity_result:
-            result["ai_near_duplicate"] = ai_similarity_result
 
         results.append(result)
 
     return {"uploaded": results}
 
 
-# ── Files list (with optional similarity matrix) ──────────────────────────────
+# ── Files list ────────────────────────────────────────────────────────────────
 
 @app.get("/files")
 def list_files(
@@ -222,30 +214,35 @@ def list_files(
     user = db.query(models.User).filter_by(username=current_user).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found — please log in again")
+
     files = db.query(models.File).filter_by(user_id=user.id).all()
-    return {
-        "files": [
-            {
-                "id": f.id,
-                "filename": f.original_filename,
-                "size": f.size,
-                "type": f.file_type,
-                "is_duplicate": f.is_duplicate,
-                "duplicate_of_id": f.duplicate_of_id,
-                "similarity_score": f.similarity_score,
-                "similarity_percent": (
-                    f"{f.similarity_score * 100:.1f}%" if f.similarity_score is not None else None
-                ),
-                "similar_to_filename": f.similar_to_filename,
-                "cluster_id": f.cluster_id,
-                "uploaded_at": str(f.uploaded_at),
-            }
-            for f in files
-        ]
-    }
+
+    def _file_entry(f):
+        tier = get_tier(f.similarity_score, is_exact_duplicate=f.is_duplicate)
+        return {
+            "id": f.id,
+            "filename": f.original_filename,
+            "size": f.size,
+            "type": f.file_type,
+            "duplicate_of_id": f.duplicate_of_id,
+            "similar_to_filename": f.similar_to_filename,
+            "cluster_id": f.cluster_id,
+            "uploaded_at": str(f.uploaded_at),
+            "similarity": {
+                "score": f.similarity_score,
+                "percent": tier["percent"],
+                "tier": tier["tier"],
+                "label": tier["label"],
+                "emoji": tier["emoji"],
+                "action": tier["action"],
+                "summary": tier_summary(tier),
+            },
+        }
+
+    return {"files": [_file_entry(f) for f in files]}
 
 
-# ── Grouped files view (for AI/ML track demo) ─────────────────────────────────
+# ── Grouped files view ────────────────────────────────────────────────────────
 
 @app.get("/files/groups")
 def list_file_groups(
@@ -253,13 +250,13 @@ def list_file_groups(
     current_user: str = Depends(get_current_user),
 ):
     """
-    Return files grouped by cluster_id.
-    Files without embeddings (cluster_id = None) are listed separately.
+    Files grouped by semantic cluster, with tier labels applied to each file.
 
-    This endpoint is designed for the AI/ML track demo:
-    - Each group is a semantically similar cluster found by KMeans on embeddings.
-    - Within each group files are ranked by their similarity_score (desc).
-    - Duplicate files are flagged inline.
+    Group structure:
+      - 🔴 Exact duplicates  → tier = exact
+      - 🟡 Near duplicates   → tier = near   (90–99%)
+      - 🟢 Related files     → tier = related (70–89%)
+      - ⚪ Unique            → tier = unique  (<70%)
     """
     user = db.query(models.User).filter_by(username=current_user).first()
     if not user:
@@ -271,35 +268,46 @@ def list_file_groups(
     ungrouped = []
 
     for f in files:
+        tier = get_tier(f.similarity_score, is_exact_duplicate=f.is_duplicate)
         entry = {
             "id": f.id,
             "filename": f.original_filename,
             "size": f.size,
             "type": f.file_type,
-            "is_duplicate": f.is_duplicate,
             "duplicate_of_id": f.duplicate_of_id,
-            "similarity_score": f.similarity_score,
-            "similarity_percent": (
-                f"{f.similarity_score * 100:.1f}%" if f.similarity_score is not None else None
-            ),
             "similar_to_filename": f.similar_to_filename,
             "cluster_id": f.cluster_id,
             "uploaded_at": str(f.uploaded_at),
+            "similarity": {
+                "score": f.similarity_score,
+                "percent": tier["percent"],
+                "tier": tier["tier"],
+                "label": tier["label"],
+                "emoji": tier["emoji"],
+                "action": tier["action"],
+                "summary": tier_summary(tier),
+            },
         }
         if f.cluster_id is not None:
             clusters.setdefault(f.cluster_id, []).append(entry)
         else:
             ungrouped.append(entry)
 
-    # Sort each cluster so the most similar files surface first
+    # Sort each cluster: exact → near → related → unique, then by score desc
+    tier_order = {"exact": 0, "near": 1, "related": 2, "unique": 3}
     for cid in clusters:
-        clusters[cid].sort(
-            key=lambda x: x["similarity_score"] if x["similarity_score"] is not None else 0,
-            reverse=True,
-        )
+        clusters[cid].sort(key=lambda x: (
+            tier_order.get(x["similarity"]["tier"], 9),
+            -(x["similarity"]["score"] or 0),
+        ))
 
     groups = [
-        {"cluster_id": cid, "files": members}
+        {
+            "cluster_id": cid,
+            "size": len(members),
+            "dominant_tier": members[0]["similarity"]["tier"] if members else "unique",
+            "files": members,
+        }
         for cid, members in sorted(clusters.items())
     ]
 
@@ -308,6 +316,12 @@ def list_file_groups(
         "ungrouped": ungrouped,
         "total_files": len(files),
         "total_groups": len(groups),
+        "tier_legend": {
+            "🔴 Exact Duplicate": "100% match — safe to delete",
+            "🟡 Near Duplicate":  "90–99% — review before deleting",
+            "🟢 Related File":    "70–89% — same topic, not a duplicate",
+            "⚪ Unique":          "Below 70% — independent file",
+        },
     }
 
 
@@ -318,28 +332,33 @@ def similarity_matrix(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    """
-    Return all pairwise cosine similarity scores > 0.5 for the current user's files.
-    Useful for the AI/ML track demo to visualise the full similarity graph.
-    """
+    """All pairwise cosine similarity scores > 0.5, with tier labels."""
     user = db.query(models.User).filter_by(username=current_user).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     files = db.query(models.File).filter_by(user_id=user.id).all()
     matrix = compute_similarity_matrix(files)
+    file_map = {f.id: f.original_filename for f in files}
 
-    # Convert tuple keys to serialisable strings
     return {
         "pairs": [
             {
                 "file_a_id": a,
+                "file_a_name": file_map.get(a),
                 "file_b_id": b,
+                "file_b_name": file_map.get(b),
                 "similarity_score": score,
-                "similarity_percent": f"{score * 100:.1f}%",
+                **get_tier(score),
             }
             for (a, b), score in sorted(matrix.items(), key=lambda x: -x[1])
-        ]
+        ],
+        "tier_legend": {
+            "🔴 Exact Duplicate": "100%",
+            "🟡 Near Duplicate":  "90–99%",
+            "🟢 Related File":    "70–89%",
+            "⚪ Unique":          "<70%",
+        },
     }
 
 
@@ -357,11 +376,9 @@ def delete_file(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Remove physical file from disk
     if os.path.exists(file.path):
         os.remove(file.path)
 
-    # Un-mark any files that were duplicates of this one
     db.query(models.File).filter_by(duplicate_of_id=file_id).update({
         "duplicate_of_id": None,
         "is_duplicate": False,
