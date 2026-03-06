@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+bcrypt
+sqlalchemy
+xxhash
+pillow
+imagehash
+pymupdf
+scikit-learn
+numpy
+PyJWT
+python-dotenv
+psycopg2-binary
+cohere

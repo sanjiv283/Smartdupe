@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartDupe — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1c1c26;
+      --border: #2a2a3a;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --error: #ff4d6d;
+      --success: #00e5a0;
+      --warning: #ffb347;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px; height: 60px;
+    }
+
+    .nav-logo { display: flex; align-items: center; gap: 10px; }
+    .nav-logo .icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+    }
+    .nav-logo .name { font-size: 18px; font-weight: 800; }
+    .nav-logo .name span { color: var(--accent); }
+
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    #username-badge {
+      font-family: 'Space Mono', monospace; font-size: 12px;
+      color: var(--muted); background: var(--surface);
+      border: 1px solid var(--border); padding: 5px 12px; border-radius: 20px;
+    }
+
+    .btn-sm {
+      padding: 7px 16px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+    main {
+      position: relative; z-index: 1;
+      max-width: 1200px; margin: 0 auto; padding: 40px 24px;
+    }
+
+    .page-header { margin-bottom: 36px; animation: fadeUp 0.4s ease both; }
+    .page-header h1 { font-size: 32px; font-weight: 800; }
+    .page-header p { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; margin-top: 6px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px; margin-bottom: 36px;
+    }
+
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 22px;
+      animation: fadeUp 0.4s ease both;
+    }
+    .stat-card:nth-child(2) { animation-delay: 0.05s; }
+    .stat-card:nth-child(3) { animation-delay: 0.1s; }
+    .stat-card:nth-child(4) { animation-delay: 0.15s; }
+
+    .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 800; }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.error  { color: var(--error); }
+    .stat-value.purple { color: #a78bfa; }
+
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 14px;
+      padding: 48px 24px; text-align: center; cursor: pointer;
+      transition: all 0.25s; margin-bottom: 36px;
+      background: var(--surface); animation: fadeUp 0.4s 0.1s ease both;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent); background: rgba(0,229,255,0.03);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-zone h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .upload-zone p { color: var(--muted); font-size: 13px; font-family: 'Space Mono', monospace; }
+
+    .upload-btn {
+      display: inline-block; margin-top: 18px; padding: 10px 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 8px; color: #fff;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+      cursor: pointer; transition: opacity 0.2s, transform 0.15s;
+    }
+    .upload-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    #upload-progress { display: none; margin-bottom: 28px; }
+    .progress-bar-wrap {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; height: 8px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 8px; width: 0%; transition: width 0.4s ease;
+    }
+    #progress-label { font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 8px; }
+
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+    }
+    .section-header h2 { font-size: 18px; font-weight: 800; }
+
+    .refresh-btn {
+      padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 12px;
+      cursor: pointer; font-family: 'Space Mono', monospace; transition: all 0.2s;
+    }
+    .refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    .table-wrap {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; animation: fadeUp 0.4s 0.2s ease both;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+    th {
+      padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+      font-family: 'Space Mono', monospace;
+    }
+    td {
+      padding: 13px 16px; font-size: 13px;
+      border-bottom: 1px solid rgba(42,42,58,0.5); vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .filename {
+      font-family: 'Space Mono', monospace; font-size: 12px;
+      max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; font-family: 'Space Mono', monospace;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .badge-type-image { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
+    .badge-type-pdf   { background: rgba(255,77,109,0.12); color: var(--error); border: 1px solid rgba(255,77,109,0.25); }
+    .badge-type-other { background: rgba(107,107,128,0.15); color: var(--muted); border: 1px solid var(--border); }
+    .badge-dup-yes    { background: rgba(255,77,109,0.12); color: var(--error); border: 1px solid rgba(255,77,109,0.25); }
+    .badge-dup-no     { background: rgba(0,229,160,0.1); color: var(--success); border: 1px solid rgba(0,229,160,0.25); }
+
+    /* Similarity score bar */
+    .sim-wrap { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+    .sim-bar-bg {
+      flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
+    }
+    .sim-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+    .sim-label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    .cluster-pill {
+      display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+      font-size: 11px; font-weight: 700; text-align: center; line-height: 26px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Delete button */
+    .del-btn {
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px solid rgba(255,77,109,0.3);
+      background: rgba(255,77,109,0.08);
+      color: var(--error); font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: 'Space Mono', monospace;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .del-btn:hover { background: rgba(255,77,109,0.18); border-color: var(--error); }
+    .del-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .similar-hint {
+      font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace;
+      max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .empty-state { padding: 60px 24px; text-align: center; color: var(--muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { font-family: 'Space Mono', monospace; font-size: 13px; }
+
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 20px; font-size: 13px;
+      font-family: 'Space Mono', monospace; display: none; z-index: 999;
+      animation: slideIn 0.3s ease; max-width: 340px;
+    }
+    #toast.success { border-color: rgba(0,229,160,0.4); color: var(--success); }
+    #toast.error   { border-color: rgba(255,77,109,0.4); color: var(--error); }
+
+    .no-auth { text-align: center; padding: 80px 24px; animation: fadeUp 0.4s ease; }
+    .no-auth h2 { font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+    .no-auth p  { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; margin-bottom: 24px; }
+    .no-auth a  {
+      display: inline-block; padding: 12px 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border-radius: 8px; font-weight: 700; text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .no-auth a:hover { opacity: 0.88; }
+
+    @keyframes slideIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeUp  { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+    .c0 { background:rgba(0,229,255,0.15);  color:var(--accent); }
+    .c1 { background:rgba(124,58,237,0.15); color:#a78bfa; }
+    .c2 { background:rgba(0,229,160,0.15);  color:var(--success); }
+    .c3 { background:rgba(255,179,71,0.15); color:var(--warning); }
+    .c4 { background:rgba(255,77,109,0.15); color:var(--error); }
+    .c5 { background:rgba(96,165,250,0.15); color:#60a5fa; }
+    .c6 { background:rgba(251,191,36,0.15); color:#fbbf24; }
+    .c7 { background:rgba(52,211,153,0.15); color:#34d399; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">
+      <div class="icon">⚡</div>
+      <div class="name">Smart<span>Dupe</span></div>
+    </div>
+    <div class="nav-right">
+      <span id="username-badge">not logged in</span>
+      <button class="btn-sm" id="auth-btn" onclick="handleAuth()">Login</button>
+    </div>
+  </nav>
+
+  <main id="main-content">
+    <div class="no-auth" id="no-auth-view">
+      <div style="font-size:48px;margin-bottom:16px">⚡</div>
+      <h2>Log in to use SmartDupe</h2>
+      <p>// AI-powered duplicate file detection</p>
+      <a href="/login">Go to Login →</a>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const token = localStorage.getItem('token');
+
+    function parseJwt(t) {
+      try { return JSON.parse(atob(t.split('.')[1])); } catch { return null; }
+    }
+
+    function showToast(msg, type = 'success') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = type;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3800);
+    }
+
+    function handleAuth() {
+      if (token) { localStorage.removeItem('token'); location.reload(); }
+      else { window.location.href = '/login'; }
+    }
+
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+      return (b/1048576).toFixed(1) + ' MB';
+    }
+
+    function simColor(score) {
+      if (score >= 0.95) return 'var(--error)';
+      if (score >= 0.85) return 'var(--warning)';
+      return 'var(--accent)';
+    }
+
+    function simBar(score, similarTo) {
+      if (score === null || score === undefined) return '<span style="color:var(--muted);font-size:12px">—</span>';
+      const pct = Math.round(score * 100);
+      const color = simColor(score);
+      const hint = similarTo ? `<div class="similar-hint" title="${similarTo}">vs ${similarTo}</div>` : '';
+      return `
+        <div>
+          <div class="sim-wrap">
+            <div class="sim-bar-bg"><div class="sim-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            <span class="sim-label">${pct}%</span>
+          </div>
+          ${hint}
+        </div>`;
+    }
+
+    async function deleteFile(id, name, btn) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const res = await fetch(`/files/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok) return showToast(data.detail || 'Delete failed.', 'error');
+        showToast(`🗑 "${name}" deleted.`);
+        loadFiles();
+      } catch {
+        showToast('Network error.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    }
+
+    function renderDashboard(files) {
+      const total    = files.length;
+      const dupes    = files.filter(f => f.is_duplicate).length;
+      const unique   = total - dupes;
+      const clusters = new Set(files.map(f => f.cluster_id).filter(c => c !== null)).size;
+
+      document.getElementById('main-content').innerHTML = `
+        <div class="page-header">
+          <h1>Dashboard</h1>
+          <p>// your files, analysed by AI</p>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card"><div class="stat-label">Total Files</div><div class="stat-value accent">${total}</div></div>
+          <div class="stat-card"><div class="stat-label">Unique</div><div class="stat-value">${unique}</div></div>
+          <div class="stat-card"><div class="stat-label">Duplicates</div><div class="stat-value error">${dupes}</div></div>
+          <div class="stat-card"><div class="stat-label">AI Clusters</div><div class="stat-value purple">${clusters}</div></div>
+        </div>
+
+        <div class="upload-zone" id="drop-zone">
+          <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx"/>
+          <div class="upload-icon">📂</div>
+          <h3>Drop files here to analyse</h3>
+          <p>Supports PDF, images, DOCX, TXT — max 50 MB each</p>
+          <button class="upload-btn" id="upload-btn" onclick="uploadFiles(event)">Upload & Analyse</button>
+        </div>
+
+        <div id="upload-progress">
+          <div id="progress-label">Uploading…</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill"></div></div>
+        </div>
+
+        <div class="section-header">
+          <h2>Your Files</h2>
+          <button class="refresh-btn" onclick="loadFiles()">↻ Refresh</button>
+        </div>
+
+        <div class="table-wrap">
+          ${total === 0 ? `
+            <div class="empty-state">
+              <div class="icon">🗂️</div>
+              <p>No files yet. Upload something above!</p>
+            </div>` : `
+          <table>
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>AI Similarity</th>
+                <th>Cluster</th>
+                <th>Uploaded</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${files.map(f => `
+                <tr>
+                  <td><div class="filename" title="${f.filename}">${f.filename}</div></td>
+                  <td><span class="badge badge-type-${f.type || 'other'}">${f.type || 'other'}</span></td>
+                  <td style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted)">${formatBytes(f.size)}</td>
+                  <td><span class="badge ${f.is_duplicate ? 'badge-dup-yes' : 'badge-dup-no'}">${f.is_duplicate ? '⚠ Dupe' : '✓ Unique'}</span></td>
+                  <td>${simBar(f.similarity_score, f.similar_to_filename)}</td>
+                  <td>${f.cluster_id !== null && f.cluster_id !== undefined
+                    ? `<span class="cluster-pill c${f.cluster_id % 8}">${f.cluster_id}</span>`
+                    : `<span style="color:var(--muted);font-size:12px">—</span>`}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted)">${f.uploaded_at ? f.uploaded_at.slice(0,16).replace('T',' ') : '—'}</td>
+                  <td><button class="del-btn" onclick="deleteFile(${f.id}, '${f.filename.replace(/'/g,"\\'")}', this)">Delete</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`}
+        </div>
+      `;
+
+      setupDropZone();
+    }
+
+    function setupDropZone() {
+      const zone = document.getElementById('drop-zone');
+      if (!zone) return;
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const input = document.getElementById('file-input');
+        const dt = new DataTransfer();
+        [...e.dataTransfer.files].forEach(f => dt.items.add(f));
+        input.files = dt.files;
+      });
+    }
+
+    async function uploadFiles(e) {
+      e.stopPropagation();
+      const input = document.getElementById('file-input');
+      if (!input.files.length) return showToast('Please select files first.', 'error');
+
+      const btn = document.getElementById('upload-btn');
+      const progress = document.getElementById('upload-progress');
+      const fill = document.getElementById('progress-fill');
+      const label = document.getElementById('progress-label');
+
+      btn.disabled = true;
+      btn.textContent = 'Analysing…';
+      progress.style.display = 'block';
+      fill.style.width = '10%';
+      label.textContent = `Uploading ${input.files.length} file(s)…`;
+
+      const formData = new FormData();
+      [...input.files].forEach(f => formData.append('files', f));
+
+      try {
+        fill.style.width = '40%';
+        const res = await fetch('/upload', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+          body: formData
+        });
+        fill.style.width = '80%';
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.detail || 'Upload failed.', 'error');
+        } else {
+          fill.style.width = '100%';
+          const dupes = data.uploaded.filter(f => f.is_exact_duplicate).length;
+          const near  = data.uploaded.filter(f => f.ai_near_duplicate).length;
+          let msg = `✓ ${data.uploaded.length} file(s) uploaded.`;
+          if (dupes) msg += ` ${dupes} exact dupe(s).`;
+          if (near)  msg += ` ${near} near-dupe(s).`;
+          showToast(msg);
+          setTimeout(() => loadFiles(), 600);
+        }
+      } catch {
+        showToast('Network error during upload.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload & Analyse';
+        setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 1200);
+      }
+    }
+
+    async function loadFiles() {
+      try {
+        const res = await fetch('/files', { headers: { Authorization: 'Bearer ' + token } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        renderDashboard(data.files);
+      } catch {
+        renderDashboard([]);
+      }
+    }
+
+    // Init
+    if (token) {
+      const payload = parseJwt(token);
+      const username = payload?.sub || 'user';
+      document.getElementById('username-badge').textContent = '@ ' + username;
+      document.getElementById('auth-btn').textContent = 'Logout';
+      loadFiles();
+    }
+  </script>
+</body>
+</html>
