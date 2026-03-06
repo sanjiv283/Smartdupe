@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import numpy as np
 import fitz
 from PIL import Image
@@ -14,6 +15,7 @@ from sklearn.cluster import KMeans
 _cohere_client = None
 _st_model = None
 
+
 def _get_cohere():
     global _cohere_client
     if _cohere_client is None:
@@ -26,6 +28,7 @@ def _get_cohere():
                 pass
     return _cohere_client
 
+
 def _get_st_model():
     global _st_model
     if _st_model is None:
@@ -37,16 +40,37 @@ def _get_st_model():
     return _st_model
 
 
+# ── Text normalisation ────────────────────────────────────────────────────────
+
+def normalise_text(text: str) -> str:
+    """
+    Normalise text so that trivial changes (case, extra whitespace, punctuation)
+    do NOT produce different embeddings or hashes.
+
+    Pipeline:
+      1. Lowercase
+      2. Collapse all whitespace (tabs, newlines, multiple spaces) → single space
+      3. Strip leading / trailing whitespace
+      4. Remove punctuation that carries no semantic meaning
+         (keeps alpha-numeric and spaces)
+    """
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", " ", text)       # drop punctuation
+    text = re.sub(r"\s+", " ", text).strip()   # collapse whitespace
+    return text
+
+
 # ── Core embedding function ───────────────────────────────────────────────────
 
 def get_text_embedding(text: str) -> np.ndarray | None:
     """
     Generate a semantic embedding vector for a text string.
+    Normalises text first so that case/whitespace variants embed identically.
     Uses Cohere if API key is available, otherwise falls back to
-    sentence-transformers (all-MiniLM-L6-v2) with cosine similarity.
+    sentence-transformers (all-MiniLM-L6-v2).
     Returns a numpy array or None if both fail.
     """
-    text = text[:2048]  # truncate for token limits
+    text = normalise_text(text)[:2048]   # normalise THEN truncate
 
     # Try Cohere first
     co = _get_cohere()
@@ -61,7 +85,7 @@ def get_text_embedding(text: str) -> np.ndarray | None:
         except Exception:
             pass
 
-    # Fall back to sentence-transformers + cosine similarity
+    # Fall back to sentence-transformers
     model = _get_st_model()
     if model:
         try:
@@ -86,7 +110,8 @@ def extract_text(pdf_path: str) -> str:
 def text_similarity(text1: str, text2: str) -> float:
     """
     Return cosine similarity (0–1) between two text strings.
-    Uses sentence-transformers embeddings + sklearn cosine_similarity.
+    Both strings are normalised before embedding, so case / whitespace
+    differences do not affect the score.
     """
     v1 = get_text_embedding(text1)
     v2 = get_text_embedding(text2)
@@ -122,7 +147,6 @@ def image_phash_similarity(hash1: str, hash2: str) -> float:
 def cluster_files(file_records, n_clusters: int = None) -> dict:
     """
     Cluster files by their stored embedding vectors using KMeans.
-    Uses cosine similarity implicitly through the embedding space.
 
     Args:
         file_records: list of File ORM objects with embedding_vector set.
@@ -133,8 +157,11 @@ def cluster_files(file_records, n_clusters: int = None) -> dict:
     """
     files_with_embeddings = [f for f in file_records if f.embedding_vector]
 
-    if len(files_with_embeddings) < 2:
-        return {f.id: 0 for f in files_with_embeddings}
+    if not files_with_embeddings:
+        return {}
+
+    if len(files_with_embeddings) == 1:
+        return {files_with_embeddings[0].id: 0}
 
     vectors = np.array([
         json.loads(f.embedding_vector) for f in files_with_embeddings
@@ -151,6 +178,35 @@ def cluster_files(file_records, n_clusters: int = None) -> dict:
     return {f.id: int(label) for f, label in zip(files_with_embeddings, labels)}
 
 
+# ── Pairwise similarity matrix ────────────────────────────────────────────────
+
+def compute_similarity_matrix(file_records) -> dict:
+    """
+    Compute all pairwise cosine similarity scores for files that have embeddings.
+
+    Returns:
+        dict of { (file_id_a, file_id_b): similarity_score }
+        Only pairs with similarity > 0.5 are included to keep the payload small.
+    """
+    files_with_embeddings = [f for f in file_records if f.embedding_vector]
+    if len(files_with_embeddings) < 2:
+        return {}
+
+    ids = [f.id for f in files_with_embeddings]
+    vectors = np.array([json.loads(f.embedding_vector) for f in files_with_embeddings])
+
+    sim_matrix = cosine_similarity(vectors)
+    result = {}
+    n = len(ids)
+    for i in range(n):
+        for j in range(i + 1, n):
+            score = float(sim_matrix[i][j])
+            if score > 0.5:
+                result[(ids[i], ids[j])] = round(score, 4)
+
+    return result
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def get_embedding_for_file(file_path: str, file_type: str) -> list | None:
@@ -158,27 +214,36 @@ def get_embedding_for_file(file_path: str, file_type: str) -> list | None:
     Generate a vector embedding for a file depending on its type.
 
     Pipeline:
-    - PDF:   extract text → sentence-transformer embedding → cosine similarity ready
-    - Image: compute pHash → embed as text string → cosine similarity ready
-    - Other: returns None
-
-    Returns a plain Python list (JSON-serialisable) or None if unsupported.
+    - PDF:   extract text → normalise → sentence-transformer embedding
+    - Image: compute pHash → embed as descriptive text string
+    - Other (txt/docx): read raw text → normalise → embed
+    - Returns None if unsupported or extraction fails.
     """
     try:
         if file_type == "pdf":
             text = extract_text(file_path)
             if text.strip():
-                vec = get_text_embedding(text)
+                vec = get_text_embedding(text)   # normalise happens inside
                 if vec is not None:
                     return vec.tolist()
 
         elif file_type == "image":
             phash_str = image_phash(file_path)
-            # Encode pHash as a descriptive string so it enters the same
-            # embedding space as text documents for unified clustering
             vec = get_text_embedding(f"image perceptual hash {phash_str}")
             if vec is not None:
                 return vec.tolist()
+
+        elif file_type == "other":
+            # Try to read as plain text (covers .txt, .docx text streams, etc.)
+            try:
+                with open(file_path, "r", errors="ignore") as fh:
+                    raw = fh.read()
+                if raw.strip():
+                    vec = get_text_embedding(raw)
+                    if vec is not None:
+                        return vec.tolist()
+            except Exception:
+                pass
 
     except Exception:
         pass
