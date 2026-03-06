@@ -223,7 +223,7 @@ def get_embedding_for_file(file_path: str, file_type: str) -> list | None:
         if file_type == "pdf":
             text = extract_text(file_path)
             if text.strip():
-                vec = get_text_embedding(text)   # normalise happens inside
+                vec = get_text_embedding(text)
                 if vec is not None:
                     return vec.tolist()
 
@@ -234,7 +234,6 @@ def get_embedding_for_file(file_path: str, file_type: str) -> list | None:
                 return vec.tolist()
 
         elif file_type == "other":
-            # Try to read as plain text (covers .txt, .docx text streams, etc.)
             try:
                 with open(file_path, "r", errors="ignore") as fh:
                     raw = fh.read()

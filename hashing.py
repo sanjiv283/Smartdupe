@@ -6,15 +6,6 @@ def _normalise_bytes(data: bytes) -> bytes:
     """
     Normalise raw bytes for TEXT-like files so that case / whitespace
     changes don't produce a different hash.
-
-    Strategy:
-      - Decode as UTF-8 (ignore errors)
-      - Lowercase
-      - Collapse whitespace
-      - Re-encode to UTF-8
-
-    For binary files (PDF, images) this normalisation is skipped and the
-    original bytes are hashed directly — content equality matters there.
     """
     try:
         text = data.decode("utf-8", errors="ignore")
@@ -25,7 +16,6 @@ def _normalise_bytes(data: bytes) -> bytes:
         return data
 
 
-# ── Text-file extensions that should be normalised before hashing ─────────────
 _TEXT_EXTS = {".txt", ".md", ".csv", ".html", ".htm", ".json", ".xml", ".log"}
 
 
@@ -61,12 +51,10 @@ def full_hash(file_path: str) -> str:
     h = xxhash.xxh64()
     try:
         if _should_normalise(file_path):
-            # For text files read everything, normalise, then hash
             with open(file_path, "rb") as f:
                 data = f.read()
             h.update(_normalise_bytes(data))
         else:
-            # Binary files: stream in chunks
             with open(file_path, "rb") as f:
                 for chunk in iter(lambda: f.read(65536), b""):
                     h.update(chunk)
