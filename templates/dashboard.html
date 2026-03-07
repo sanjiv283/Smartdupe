@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -8,7 +8,8 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
+    /* ── DARK THEME (default) ── */
+    :root[data-theme="dark"] {
       --bg: #0a0a0f;
       --surface: #13131a;
       --surface2: #1c1c26;
@@ -20,6 +21,25 @@
       --error: #ff4d6d;
       --success: #00e5a0;
       --warning: #ffb347;
+      --nav-bg: rgba(10,10,15,0.85);
+      --grid-color: rgba(0,229,255,0.025);
+    }
+
+    /* ── LIGHT THEME ── */
+    :root[data-theme="light"] {
+      --bg: #f0f4f9;
+      --surface: #ffffff;
+      --surface2: #e4eaf4;
+      --border: #ccd6e8;
+      --accent: #0088aa;
+      --accent2: #6d28d9;
+      --text: #0d1117;
+      --muted: #556070;
+      --error: #dc2626;
+      --success: #059669;
+      --warning: #d97706;
+      --nav-bg: rgba(240,244,249,0.92);
+      --grid-color: rgba(0,136,170,0.05);
     }
 
     body {
@@ -27,25 +47,27 @@
       color: var(--text);
       font-family: 'Syne', sans-serif;
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
 
     body::before {
       content: '';
       position: fixed; inset: 0;
       background-image:
-        linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
       background-size: 40px 40px;
       pointer-events: none; z-index: 0;
     }
 
     nav {
       position: sticky; top: 0; z-index: 100;
-      background: rgba(10,10,15,0.85);
+      background: var(--nav-bg);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 32px; height: 60px;
+      transition: background 0.3s, border-color 0.3s;
     }
 
     .nav-logo { display: flex; align-items: center; gap: 10px; }
@@ -55,15 +77,45 @@
       border-radius: 7px;
       display: flex; align-items: center; justify-content: center; font-size: 15px;
     }
-    .nav-logo .name { font-size: 18px; font-weight: 800; }
+    .nav-logo .name { font-size: 18px; font-weight: 800; color: var(--text); }
     .nav-logo .name span { color: var(--accent); }
 
-    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-right { display: flex; align-items: center; gap: 14px; }
+
     #username-badge {
       font-family: 'Space Mono', monospace; font-size: 12px;
       color: var(--muted); background: var(--surface);
       border: 1px solid var(--border); padding: 5px 12px; border-radius: 20px;
+      transition: background 0.3s, border-color 0.3s;
     }
+
+    /* ── THEME TOGGLE ── */
+    .theme-toggle-wrap {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; user-select: none;
+    }
+    .theme-toggle-track {
+      width: 44px; height: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      position: relative;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .theme-toggle-knob {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: transform 0.3s, background 0.3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    [data-theme="light"] .theme-toggle-knob {
+      transform: translateX(20px);
+      background: #f59e0b;
+    }
+    .theme-icon { font-size: 14px; line-height: 1; }
 
     .btn-sm {
       padding: 7px 16px; border-radius: 7px; border: 1px solid var(--border);
@@ -79,7 +131,7 @@
     }
 
     .page-header { margin-bottom: 36px; animation: fadeUp 0.4s ease both; }
-    .page-header h1 { font-size: 32px; font-weight: 800; }
+    .page-header h1 { font-size: 32px; font-weight: 800; color: var(--text); }
     .page-header p { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; margin-top: 6px; }
 
     .stats {
@@ -92,32 +144,33 @@
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 12px; padding: 20px 22px;
       animation: fadeUp 0.4s ease both;
+      transition: background 0.3s, border-color 0.3s;
     }
     .stat-card:nth-child(2) { animation-delay: 0.05s; }
     .stat-card:nth-child(3) { animation-delay: 0.1s; }
     .stat-card:nth-child(4) { animation-delay: 0.15s; }
 
     .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 8px; }
-    .stat-value { font-size: 28px; font-weight: 800; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--text); }
     .stat-value.accent { color: var(--accent); }
     .stat-value.error  { color: var(--error); }
-    .stat-value.purple { color: #a78bfa; }
+    .stat-value.purple { color: var(--accent2); }
 
     .upload-zone {
       border: 2px dashed var(--border); border-radius: 14px;
       padding: 48px 24px; text-align: center; cursor: pointer;
-      transition: all 0.25s; margin-bottom: 36px;
+      transition: all 0.25s; margin-bottom: 20px;
       background: var(--surface); animation: fadeUp 0.4s 0.1s ease both;
       position: relative;
     }
     .upload-zone:hover, .upload-zone.drag-over {
-      border-color: var(--accent); background: rgba(0,229,255,0.03);
+      border-color: var(--accent); background: var(--surface2);
     }
     .upload-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
     }
     .upload-icon { font-size: 40px; margin-bottom: 12px; }
-    .upload-zone h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .upload-zone h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
     .upload-zone p { color: var(--muted); font-size: 13px; font-family: 'Space Mono', monospace; }
 
     .upload-btn {
@@ -145,7 +198,7 @@
     .section-header {
       display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
     }
-    .section-header h2 { font-size: 18px; font-weight: 800; }
+    .section-header h2 { font-size: 18px; font-weight: 800; color: var(--text); }
 
     .refresh-btn {
       padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
@@ -157,6 +210,7 @@
     .table-wrap {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 14px; overflow: hidden; animation: fadeUp 0.4s 0.2s ease both;
+      transition: background 0.3s, border-color 0.3s;
     }
 
     table { width: 100%; border-collapse: collapse; }
@@ -168,14 +222,16 @@
     }
     td {
       padding: 13px 16px; font-size: 13px;
-      border-bottom: 1px solid rgba(42,42,58,0.5); vertical-align: middle;
+      border-bottom: 1px solid var(--border); vertical-align: middle;
+      color: var(--text);
     }
     tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
+    tr:hover td { background: var(--surface2); }
 
     .filename {
       font-family: 'Space Mono', monospace; font-size: 12px;
       max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: var(--text);
     }
 
     .badge {
@@ -183,17 +239,14 @@
       font-size: 11px; font-weight: 700; font-family: 'Space Mono', monospace;
       text-transform: uppercase; letter-spacing: 0.06em;
     }
-    .badge-type-image { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
-    .badge-type-pdf   { background: rgba(255,77,109,0.12); color: var(--error); border: 1px solid rgba(255,77,109,0.25); }
-    .badge-type-other { background: rgba(107,107,128,0.15); color: var(--muted); border: 1px solid var(--border); }
-    .badge-dup-yes    { background: rgba(255,77,109,0.12); color: var(--error); border: 1px solid rgba(255,77,109,0.25); }
-    .badge-dup-no     { background: rgba(0,229,160,0.1); color: var(--success); border: 1px solid rgba(0,229,160,0.25); }
+    .badge-type-image { background: rgba(124,58,237,0.15); color: var(--accent2); border: 1px solid rgba(124,58,237,0.3); }
+    .badge-type-pdf   { background: rgba(220,38,38,0.12);  color: var(--error);   border: 1px solid rgba(220,38,38,0.25); }
+    .badge-type-other { background: var(--surface2);        color: var(--muted);   border: 1px solid var(--border); }
+    .badge-dup-yes    { background: rgba(220,38,38,0.12);  color: var(--error);   border: 1px solid rgba(220,38,38,0.25); }
+    .badge-dup-no     { background: rgba(5,150,105,0.12);  color: var(--success); border: 1px solid rgba(5,150,105,0.25); }
 
-    /* Similarity score bar */
     .sim-wrap { display: flex; align-items: center; gap: 8px; min-width: 120px; }
-    .sim-bar-bg {
-      flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
-    }
+    .sim-bar-bg { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
     .sim-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
     .sim-label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
 
@@ -203,16 +256,15 @@
       font-family: 'Space Mono', monospace;
     }
 
-    /* Delete button */
     .del-btn {
       padding: 5px 12px; border-radius: 6px;
-      border: 1px solid rgba(255,77,109,0.3);
-      background: rgba(255,77,109,0.08);
+      border: 1px solid rgba(220,38,38,0.3);
+      background: rgba(220,38,38,0.08);
       color: var(--error); font-size: 12px; font-weight: 700;
       cursor: pointer; font-family: 'Space Mono', monospace;
       transition: all 0.2s; white-space: nowrap;
     }
-    .del-btn:hover { background: rgba(255,77,109,0.18); border-color: var(--error); }
+    .del-btn:hover { background: rgba(220,38,38,0.18); border-color: var(--error); }
     .del-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .similar-hint {
@@ -229,10 +281,11 @@
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 10px; padding: 14px 20px; font-size: 13px;
       font-family: 'Space Mono', monospace; display: none; z-index: 999;
-      animation: slideIn 0.3s ease; max-width: 340px;
+      animation: slideIn 0.3s ease; max-width: 340px; color: var(--text);
+      transition: background 0.3s, border-color 0.3s;
     }
-    #toast.success { border-color: rgba(0,229,160,0.4); color: var(--success); }
-    #toast.error   { border-color: rgba(255,77,109,0.4); color: var(--error); }
+    #toast.success { border-color: rgba(5,150,105,0.5); color: var(--success); }
+    #toast.error   { border-color: rgba(220,38,38,0.5); color: var(--error); }
 
     .no-auth { text-align: center; padding: 80px 24px; animation: fadeUp 0.4s ease; }
     .no-auth h2 { font-size: 24px; font-weight: 800; margin-bottom: 10px; }
@@ -249,10 +302,10 @@
     @keyframes fadeUp  { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 
     .c0 { background:rgba(0,229,255,0.15);  color:var(--accent); }
-    .c1 { background:rgba(124,58,237,0.15); color:#a78bfa; }
-    .c2 { background:rgba(0,229,160,0.15);  color:var(--success); }
-    .c3 { background:rgba(255,179,71,0.15); color:var(--warning); }
-    .c4 { background:rgba(255,77,109,0.15); color:var(--error); }
+    .c1 { background:rgba(124,58,237,0.15); color:var(--accent2); }
+    .c2 { background:rgba(5,150,105,0.15);  color:var(--success); }
+    .c3 { background:rgba(217,119,6,0.15);  color:var(--warning); }
+    .c4 { background:rgba(220,38,38,0.15);  color:var(--error); }
     .c5 { background:rgba(96,165,250,0.15); color:#60a5fa; }
     .c6 { background:rgba(251,191,36,0.15); color:#fbbf24; }
     .c7 { background:rgba(52,211,153,0.15); color:#34d399; }
@@ -267,6 +320,16 @@
     </div>
     <div class="nav-right">
       <span id="username-badge">not logged in</span>
+
+      <!-- ── DARK / LIGHT TOGGLE ── -->
+      <div class="theme-toggle-wrap" onclick="toggleTheme()" title="Toggle dark / light mode">
+        <span class="theme-icon">🌙</span>
+        <div class="theme-toggle-track">
+          <div class="theme-toggle-knob"></div>
+        </div>
+        <span class="theme-icon">☀️</span>
+      </div>
+
       <button class="btn-sm" id="auth-btn" onclick="handleAuth()">Login</button>
     </div>
   </nav>
@@ -283,6 +346,21 @@
   <div id="toast"></div>
 
   <script>
+    // ── THEME TOGGLE ─────────────────────────────────────────────────────────
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('sd-theme', theme);
+    }
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+    // Restore saved theme immediately
+    (function () {
+      applyTheme(localStorage.getItem('sd-theme') || 'dark');
+    })();
+
+    // ── AUTH ──────────────────────────────────────────────────────────────────
     const token = localStorage.getItem('token');
 
     function parseJwt(t) {
@@ -331,8 +409,7 @@
 
     async function deleteFile(id, name, btn) {
       if (!confirm(`Delete "${name}"?`)) return;
-      btn.disabled = true;
-      btn.textContent = '…';
+      btn.disabled = true; btn.textContent = '…';
       try {
         const res = await fetch(`/files/${id}`, {
           method: 'DELETE',
@@ -344,8 +421,7 @@
         loadFiles();
       } catch {
         showToast('Network error.', 'error');
-        btn.disabled = false;
-        btn.textContent = 'Delete';
+        btn.disabled = false; btn.textContent = 'Delete';
       }
     }
 
@@ -374,13 +450,9 @@
           <h3>Click here to select files</h3>
           <p id="file-selected-label">Supports PDF, images, DOCX, TXT — max 50 MB each</p>
         </div>
-        <div style="text-align:center;margin-top:16px;display:flex;gap:12px;justify-content:center;">
-          <button class="upload-btn" id="upload-btn" onclick="doUpload(event)" style="background:linear-gradient(135deg,#00e5ff,#0099bb);">
-            📤 Upload Files
-          </button>
-          <button class="upload-btn" id="analyse-btn" onclick="doAnalyse(event)" style="background:linear-gradient(135deg,#7c3aed,#4f1db5);" disabled>
-            🧠 Analyse
-          </button>
+        <div style="text-align:center;margin-bottom:28px;display:flex;gap:12px;justify-content:center;">
+          <button class="upload-btn" id="upload-btn" onclick="doUpload(event)">📤 Upload Files</button>
+          <button class="upload-btn" id="analyse-btn" onclick="doAnalyse(event)" style="background:linear-gradient(135deg,var(--accent2),#4f1db5);" disabled>🧠 Analyse</button>
         </div>
 
         <div id="upload-progress">
@@ -402,14 +474,8 @@
           <table>
             <thead>
               <tr>
-                <th>Filename</th>
-                <th>Type</th>
-                <th>Size</th>
-                <th>Status</th>
-                <th>AI Similarity</th>
-                <th>Cluster</th>
-                <th>Uploaded</th>
-                <th>Action</th>
+                <th>Filename</th><th>Type</th><th>Size</th><th>Status</th>
+                <th>AI Similarity</th><th>Cluster</th><th>Uploaded</th><th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -424,14 +490,12 @@
                     ? `<span class="cluster-pill c${f.cluster_id % 8}">${f.cluster_id}</span>`
                     : `<span style="color:var(--muted);font-size:12px">—</span>`}</td>
                   <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted)">${f.uploaded_at ? f.uploaded_at.slice(0,16).replace('T',' ') : '—'}</td>
-                  <td><button class="del-btn" onclick="deleteFile(${f.id}, '${f.filename.replace(/'/g,"\\'")}', this)">Delete</button></td>
-                </tr>
-              `).join('')}
+                  <td><button class="del-btn" onclick="deleteFile(${f.id},'${f.filename.replace(/'/g,"\\'")}',this)">Delete</button></td>
+                </tr>`).join('')}
             </tbody>
           </table>`}
         </div>
       `;
-
       setupDropZone();
     }
 
@@ -439,7 +503,7 @@
       const input = document.getElementById('file-input');
       const label = document.getElementById('file-selected-label');
       if (input && label && input.files.length > 0) {
-        label.textContent = input.files.length + ' file(s) selected — click Upload & Analyse';
+        label.textContent = input.files.length + ' file(s) selected — click Upload';
         label.style.color = 'var(--accent)';
       }
     }
@@ -450,8 +514,7 @@
       zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
       zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
       zone.addEventListener('drop', e => {
-        e.preventDefault();
-        zone.classList.remove('drag-over');
+        e.preventDefault(); zone.classList.remove('drag-over');
         const input = document.getElementById('file-input');
         const dt = new DataTransfer();
         [...e.dataTransfer.files].forEach(f => dt.items.add(f));
@@ -460,54 +523,33 @@
       });
     }
 
-    // Stores uploaded file results for the analyse step
     let uploadedResults = [];
 
     async function doUpload(e) {
       e.stopPropagation();
       const input = document.getElementById('file-input');
       if (!input.files.length) return showToast('Please select files first.', 'error');
-
       const btn = document.getElementById('upload-btn');
       const analyseBtn = document.getElementById('analyse-btn');
       const progress = document.getElementById('upload-progress');
       const fill = document.getElementById('progress-fill');
       const label = document.getElementById('progress-label');
-
-      btn.disabled = true;
-      btn.textContent = '🔄 Uploading…';
+      btn.disabled = true; btn.textContent = '🔄 Uploading…';
       analyseBtn.disabled = true;
-      progress.style.display = 'block';
-      fill.style.width = '10%';
+      progress.style.display = 'block'; fill.style.width = '10%';
       label.textContent = `Uploading ${input.files.length} file(s)…`;
-
       const formData = new FormData();
       [...input.files].forEach(f => formData.append('files', f));
-
       try {
         fill.style.width = '50%';
-        const res = await fetch('/upload', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token },
-          body: formData
-        });
+        const res = await fetch('/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: formData });
         fill.style.width = '100%';
         const data = await res.json();
-
-        if (!res.ok) {
-          showToast(data.detail || 'Upload failed.', 'error');
-          analyseBtn.disabled = true;
-        } else {
-          uploadedResults = data.uploaded;
-          showToast(`✓ ${data.uploaded.length} file(s) uploaded! Now click Analyse.`);
-          analyseBtn.disabled = false;
-          analyseBtn.style.opacity = '1';
-        }
-      } catch {
-        showToast('Network error during upload.', 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '📤 Upload Files';
+        if (!res.ok) { showToast(data.detail || 'Upload failed.', 'error'); analyseBtn.disabled = true; }
+        else { uploadedResults = data.uploaded; showToast(`✓ ${data.uploaded.length} file(s) uploaded! Now click Analyse.`); analyseBtn.disabled = false; }
+      } catch { showToast('Network error during upload.', 'error'); }
+      finally {
+        btn.disabled = false; btn.textContent = '📤 Upload Files';
         setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 1000);
       }
     }
@@ -515,28 +557,18 @@
     async function doAnalyse(e) {
       e.stopPropagation();
       if (!uploadedResults.length) return showToast('Please upload files first.', 'error');
-
       const btn = document.getElementById('analyse-btn');
-      btn.disabled = true;
-      btn.textContent = '🧠 Analysing…';
-
-      // Results are already computed during upload — just load and display them
+      btn.disabled = true; btn.textContent = '🧠 Analysing…';
       const dupes = uploadedResults.filter(f => f.is_exact_duplicate).length;
       const near  = uploadedResults.filter(f => f.ai_near_duplicate).length;
-
       let msg = `🧠 Analysis complete! ${uploadedResults.length} file(s) processed.`;
       if (dupes) msg += ` ${dupes} exact duplicate(s) found.`;
       if (near)  msg += ` ${near} near-duplicate(s) found.`;
-
       showToast(msg);
       await loadFiles();
-
       btn.textContent = '✓ Done';
       uploadedResults = [];
-      setTimeout(() => {
-        btn.disabled = true;
-        btn.textContent = '🧠 Analyse';
-      }, 2000);
+      setTimeout(() => { btn.disabled = true; btn.textContent = '🧠 Analyse'; }, 2000);
     }
 
     async function loadFiles() {
@@ -545,16 +577,12 @@
         if (!res.ok) throw new Error();
         const data = await res.json();
         renderDashboard(data.files);
-      } catch {
-        renderDashboard([]);
-      }
+      } catch { renderDashboard([]); }
     }
 
-    // Init
     if (token) {
       const payload = parseJwt(token);
-      const username = payload?.sub || 'user';
-      document.getElementById('username-badge').textContent = '@ ' + username;
+      document.getElementById('username-badge').textContent = '@ ' + (payload?.sub || 'user');
       document.getElementById('auth-btn').textContent = 'Logout';
       loadFiles();
     }
